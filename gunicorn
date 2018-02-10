@@ -1,0 +1,69 @@
+#!/bin/bash
+# chkconfig: 2345 90 90
+
+APP_PATH=/opt/alexa
+MPID=/var/run/gunicorn-master.pid
+WPID=/var/run/gunicorn-worker.pid
+
+start () {
+   if [ -f $MPID ]; then
+      echo "$0 appears to already be running"
+      exit 1
+   fi
+   echo -e "Starting $0" 
+   cd $APP_PATH
+   /usr/bin/gunicorn --user=alexa --group=alexa --daemon home:app 
+   sleep 2
+   WORKER=$(pidof "gunicorn: worker [home:app]")
+   MASTER=$(pidof "gunicorn: master [home:app]")
+   echo $WORKER > $WPID
+   echo $MASTER > $MPID
+}
+
+stop () {
+   status > /dev/null
+   if [ $? -eq 1 ]; then
+      echo "$0 is not running"
+      exit 1
+   fi
+   echo -e "Stopping $0"
+   for pid in $WPID $MPID; do 
+	   kill -9 $(cat $pid)
+       if [ $? -eq 0 ]; then
+          rm $pid
+       fi
+   done
+}
+
+
+status () {
+      if [ -f $MPID ]; then
+          netstat -antp |grep 8000
+	  return 0
+      else
+	  echo "$0 is not running"
+	  return 1
+      fi
+}
+
+
+case "$1" in
+        start)
+                start
+                ;;
+        stop)
+                stop
+                ;;
+        status)
+		status
+                ;;
+        restart)
+                stop && start
+                ;;
+        *)
+
+                echo "Usage: (start|stop|status|restart]"
+                exit 1
+
+        esac
+        exit $?
